@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>今天，也想好好做自己｜BE YOURSELF</title>
+<style>
+:root{--ink:#28253b;--cream:#fff9ed;--pink:#f4a9b8;--lav:#c9b8ed;--mint:#b9dfce;--gold:#f5d58a}
+*{box-sizing:border-box}body{margin:0;background:#f3eaf0;color:var(--ink);font-family:ui-rounded,"Noto Sans TC",system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;padding:18px}
+main{width:min(100%,920px);background:var(--cream);border:4px solid var(--ink);border-radius:18px;box-shadow:8px 8px 0 var(--ink);overflow:hidden}
+header{padding:18px 22px 12px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;background:#f8dce2;border-bottom:3px solid var(--ink)}
+h1{font-size:clamp(20px,4vw,30px);margin:0;letter-spacing:1px}header p{margin:4px 0 0;font-size:13px}
+.stats{display:flex;gap:8px;flex-wrap:wrap}.stat{background:#fff;border:2px solid var(--ink);border-radius:10px;padding:6px 10px;font-size:12px}.stat b{font-size:16px}
+.stage{padding:16px;display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:14px}
+canvas{width:100%;height:auto;display:block;background:#d9eadb;border:3px solid var(--ink);border-radius:12px;image-rendering:pixelated}
+.side{display:flex;flex-direction:column;gap:10px}.panel{background:white;border:2px solid var(--ink);border-radius:12px;padding:12px}.panel h2{font-size:15px;margin:0 0 8px}.panel p{font-size:13px;line-height:1.65;margin:0}
+.controls{font-size:12px;color:#59556a;line-height:1.8}
+button{font:inherit;border:2px solid var(--ink);border-radius:9px;background:#f6d6df;color:var(--ink);padding:9px 12px;font-weight:700;cursor:pointer}button:hover{transform:translateY(-1px);box-shadow:2px 2px 0 var(--ink)}button:focus-visible{outline:3px solid #8064c7;outline-offset:2px}
+footer{border-top:3px solid var(--ink);padding:12px 18px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;background:#fff}
+#dialog{position:fixed;inset:0;background:#211d3788;display:none;place-items:center;padding:18px;z-index:5}#dialog.show{display:grid}.dialogbox{width:min(100%,520px);background:var(--cream);border:4px solid var(--ink);border-radius:16px;padding:20px;box-shadow:7px 7px 0 var(--ink)}.dialogbox h2{margin:0 0 10px;font-size:21px}.dialogbox p{line-height:1.8;margin:0 0 14px}.choices{display:grid;gap:8px}.choices button{text-align:left;background:#fff}
+@media(max-width:700px){.stage{grid-template-columns:1fr}.side{display:grid;grid-template-columns:1fr 1fr}.side .panel:first-child{grid-column:1/-1}}
+</style></head>
+<body><main>
+<header><div><h1>今天，也想好好做自己</h1><p>BE YOURSELF · A DAY IN MY LIFE</p></div><div class="stats"><div class="stat">安心感　<b id="comfort">50</b></div><div class="stat">支持感　<b id="support">50</b></div><div class="stat">壓力值　<b id="stress">20</b></div></div></header>
+<section class="stage"><div><canvas id="game" width="640" height="440" aria-label="像素風校園地圖"></canvas></div>
+<aside class="side"><div class="panel"><h2 id="place">我的房間</h2><p id="hint">新的一天開始了。走出房間，看看今天會遇見什麼吧。</p></div><div class="panel"><h2>今天的小提醒</h2><p>每個人都有自己的步調。你可以選擇分享，也可以保留自己的故事。</p></div><div class="panel controls"><b>操作方式</b><br>WASD／方向鍵：移動<br>E／Enter：互動<br>靠近人物或物件即可互動</div></aside></section>
+<footer><span id="objective">目標：和身邊的人聊聊，完成今天的日常。</span><button id="restart">重新開始</button></footer>
+</main>
+<div id="dialog"><div class="dialogbox"><h2 id="dlgTitle"></h2><p id="dlgText"></p><div class="choices" id="choices"></div></div></div>
+<script>
+const c=document.getElementById('game'),ctx=c.getContext('2d'),$=id=>document.getElementById(id);
+let x=105,y=320,scene=0,comfort=50,support=50,stress=20,done={},near=null,keys={},ending=false;
+const scenes=[
+{name:'我的房間',floor:'#d8e9d7',objects:[{x:500,y:115,w:80,h:65,label:'書桌',id:'desk',color:'#c89c79'},{x:115,y:125,w:95,h:65,label:'床',id:'bed',color:'#d9a9bf'},{x:315,y:215,w:65,h:60,label:'背包',id:'bag',color:'#d9bd79'}]},
+{name:'學校走廊',floor:'#e9dfcf',objects:[{x:490,y:120,w:90,h:75,label:'公告欄',id:'board',color:'#c9b8ed'},{x:300,y:300,w:62,h:62,label:'同學小安',id:'an',color:'#e7a6a4',npc:true},{x:125,y:125,w:65,h:65,label:'置物櫃',id:'locker',color:'#8fb5c7'}]},
+{name:'校園中庭',floor:'#cce3cf',objects:[{x:475,y:145,w:70,h:70,label:'朋友小晴',id:'qing',color:'#e6a9c2',npc:true},{x:170,y:300,w:95,h:55,label:'長椅',id:'bench',color:'#b78b65'},{x:340,y:100,w:65,h:65,label:'社團攤位',id:'club',color:'#e9c778'}]},
+{name:'回家路上',floor:'#d8d9ee',objects:[{x:480,y:130,w:90,h:70,label:'便利商店',id:'store',color:'#a6c8db'},{x:270,y:300,w:60,h:60,label:'路人',id:'stranger',color:'#b9a5d9',npc:true},{x:120,y:120,w:65,h:65,label:'公車站',id:'bus',color:'#e9c778'}]},
+{name:'家裡的客廳',floor:'#f0dfca',objects:[{x:480,y:290,w:100,h:60,label:'沙發',id:'sofa',color:'#c99fb1'},{x:130,y:125,w:75,h:70,label:'家人',id:'family',color:'#9cbca8',npc:true},{x:330,y:125,w:65,h:60,label:'相片',id:'photo',color:'#e8c97e'}]}
+];
+const events={
+bed:['整理一下心情','你看著窗外，想起今天還有很多可能。','好好準備，帶著自己的步調出門。',{}],
+desk:['桌上的日記','「今天想對自己好一點。」你在日記寫下這句話。','記下自己的心情，也是一種照顧。',{}],
+bag:['背起背包','把喜歡的小吊飾掛在背包上，今天就帶著它出門吧。','小小的喜好，也值得被珍惜。',{}],
+board:['校園公告','社團正在舉辦多元文化週，歡迎大家分享自己的故事，也可以只來逛逛。','你決定有空再去看看。',{}],
+locker:['置物櫃上的貼紙','有人貼了一張彩虹貼紙，旁邊寫著「做自己就很好」。','看到這句話，心裡有一點暖暖的。',{support:4,comfort:3}],
+an:['同學小安','小安好奇地問：「你最近好像常和社團的人一起？你們在忙什麼？」','',{}],
+qing:['朋友小晴','小晴笑著說：「週末要不要一起去看展？聽說有很多有趣的作品！」','',{}],
+bench:['中庭長椅','坐下休息一會兒，聽著大家聊天的聲音。','有時候，什麼都不做也是很棒的休息。',{stress:-4,comfort:3}],
+club:['社團攤位','社團同學正在介紹多元文化週活動。你可以參加，也可以先了解看看。','',{}],
+store:['便利商店','店員親切地說：「今天新品第二件折扣喔！」你買了喜歡的飲料。','平凡的小確幸也能讓一天變好。',{stress:-3,comfort:2}],
+stranger:['路人','路人看了你包包上的彩虹吊飾幾眼，接著問：「這個有什麼特別意思嗎？」','',{}],
+bus:['公車站','公車還有幾分鐘才到。你深呼吸，讓自己慢下來。','給自己一點空間。',{stress:-3}],
+family:['家人','家人問：「最近在學校還好嗎？有沒有交到新朋友？」','',{}],
+sofa:['客廳沙發','終於回到家了。你坐下來，感覺今天慢慢告一段落。','今天不論發生什麼，你都值得好好休息。',{stress:-5,comfort:4}],
+photo:['家庭相片','看著以前的照片，你想起每個人都有自己的成長方式。','你的故事也可以慢慢寫下去。',{comfort:2}]
+};
+function draw(){
+ const s=scenes[scene];ctx.clearRect(0,0,640,440);ctx.fillStyle=s.floor;ctx.fillRect(0,0,640,440);
+ ctx.strokeStyle='#ffffff66';ctx.lineWidth=2;for(let i=0;i<640;i+=32){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,440);ctx.stroke()}for(let j=0;j<440;j+=32){ctx.beginPath();ctx.moveTo(0,j);ctx.lineTo(640,j);ctx.stroke()}
+ // decorative path
+ ctx.fillStyle='#ffffff55';ctx.fillRect(0,385,640,55);
+ s.objects.forEach(o=>{ctx.fillStyle=o.color;ctx.fillRect(o.x,o.y,o.w,o.h);ctx.strokeStyle='#383149';ctx.lineWidth=3;ctx.strokeRect(o.x,o.y,o.w,o.h);ctx.fillStyle='#383149';ctx.font='14px sans-serif';ctx.textAlign='center';ctx.fillText(o.label,o.x+o.w/2,o.y+o.h+19);if(o.npc){ctx.fillStyle='#f6d0b9';ctx.fillRect(o.x+o.w/2-12,o.y-27,24,24);ctx.fillStyle='#383149';ctx.fillRect(o.x+o.w/2-15,o.y-31,30,9)}});
+ // player
+ ctx.fillStyle='#383149';ctx.fillRect(x-12,y-5,24,24);ctx.fillStyle='#f1c6a9';ctx.fillRect(x-9,y-23,18,18);ctx.fillStyle='#8c6bb3';ctx.fillRect(x-11,y-8,22,18);ctx.fillStyle='#fff';ctx.fillRect(x-5,y-17,3,3);ctx.fillRect(x+3,y-17,3,3);
+ near=null;let best=58;s.objects.forEach(o=>{let d=Math.hypot(x-(o.x+o.w/2),y-(o.y+o.h/2));if(d<best){best=d;near=o}});
+ ctx.fillStyle='#383149';ctx.font='bold 13px sans-serif';ctx.textAlign='center';ctx.fillText(near?'按 E 互動：'+near.label:'探索地圖，靠近物件即可互動',320,28);
+ $('place').textContent=s.name;$('comfort').textContent=comfort;$('support').textContent=support;$('stress').textContent=stress;
+}
+function open(title,txt,opts){$('dlgTitle').textContent=title;$('dlgText').textContent=txt;$('choices').innerHTML='';opts.forEach(o=>{let b=document.createElement('button');b.textContent=o.label;b.onclick=()=>{if(o.change){comfort=clamp(comfort+(o.change.comfort||0));support=clamp(support+(o.change.support||0));stress=clamp(stress+(o.change.stress||0))}close();if(o.next)o.next()};$('choices').appendChild(b)});$('dialog').classList.add('show')}
+function close(){$('dialog').classList.remove('show');draw()}
+function clamp(n){return Math.max(0,Math.min(100,n))}
+function interact(){
+ if(!near)return;let id=near.id;if(done[id]){open(near.label,'你已經和這個地方／人物互動過了。', [{label:'好，繼續探索'}]);return}
+ done[id]=true;let e=events[id];
+ if(id==='an')open(e[0],e[1],[{label:'分享最近在做的社團活動',change:{support:4,comfort:3},next:()=>open('小安','「聽起來很有趣！下次有活動也找我。」',[{label:'真好，感覺被理解了',change:{support:3,stress:-2}}])},{label:'簡單帶過，聊聊別的',change:{stress:-1},next:()=>open('小安','「好啊，那你午餐想吃什麼？」',[{label:'一起去吃飯',change:{support:2}}])}]);
+ else if(id==='qing')open(e[0],e[1],[{label:'開心答應邀約',change:{support:5,comfort:3},next:()=>open('小晴','「太好了！到時候再約時間！」',[{label:'期待週末！'}])},{label:'今天想先休息',change:{comfort:2,stress:-2},next:()=>open('小晴','「沒問題，照顧好自己最重要！」',[{label:'謝謝你'}])}]);
+ else if(id==='club')open(e[0],e[1],[{label:'留下來參加活動',change:{support:5,comfort:4,stress:2},next:()=>open('社團活動','大家分享不同的生活經驗，也有人只是來聽故事。你發現每個人都有自己的方式。',[{label:'今天收穫很多',change:{comfort:3,support:2}}])},{label:'先拿活動資訊就好',change:{comfort:2,stress:-1},next:()=>open('社團活動','同學把活動資訊交給你：「想來的時候都歡迎！」',[{label:'謝謝！'}])}]);
+ else if(id==='stranger')open(e[0],e[1],[{label:'簡單介紹吊飾是自己喜歡的風格',change:{comfort:2,stress:1},next:()=>open('路人','「原來如此，滿好看的。」對方點點頭就離開了。',[{label:'繼續往前走',change:{stress:-1}}])},{label:'不想回答，禮貌地離開',change:{comfort:3,stress:-1},next:()=>open('路人','你選擇保留自己的空間，繼續走自己的路。',[{label:'這樣也很好'}])}]);
+ else if(id==='family')open(e[0],e[1],[{label:'分享最近認識的新朋友',change:{support:4,comfort:2},next:()=>open('家人','「聽起來不錯，有空也可以帶朋友來玩。」',[{label:'聊聊其他生活小事',change:{stress:-1}}])},{label:'今天有點累，先休息一下',change:{comfort:3,stress:-2},next:()=>open('家人','「好啊，先休息，晚點再吃飯。」',[{label:'謝謝關心'}])}]);
+ else open(e[0],e[1]+'\n'+e[2],[{label:'繼續今天的行程',change:e[3],next:()=>{if(scene===4&&id==='sofa')finish()}}]);
+}
+function finish(){ending=true;let msg=comfort>=65&&support>=60?'今天的你收穫了不少支持，也更自在地做自己。':stress>=55?'今天有些時刻不太容易，但你有照顧自己的感受，也為自己留了空間。':'今天有平凡的小事，也有值得記住的片刻。你正在用自己的速度認識世界。';open('一天結束了',msg+'\n\n每個人的生活都不一樣，沒有一定要達成的標準，也不需要向任何人證明自己。',[{label:'再過一天',next:()=>location.reload()}])}
+function move(){if($('dialog').classList.contains('show'))return;let dx=0,dy=0;if(keys.w||keys.ArrowUp)dy--;if(keys.s||keys.ArrowDown)dy++;if(keys.a||keys.ArrowLeft)dx--;if(keys.d||keys.ArrowRight)dx++;if(dx||dy){x=Math.max(20,Math.min(620,x+dx*3));y=Math.max(45,Math.min(420,y+dy*3));draw()}}
+document.addEventListener('keydown',e=>{let k=e.key.toLowerCase();if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();keys[k]=true;if(k==='e'||k==='enter')interact()});document.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+$('restart').onclick=()=>location.reload();
+let frame=0;function loop(){frame++;if(frame%2===0)move();requestAnimationFrame(loop)}
+// exit doorway / scene transitions
+function doorway(){if(scene<4&&x>600&&y>350){scene++;x=42;y=320;done={};$('objective').textContent='目標：探索 '+scenes[scene].name+'，和周圍的人事物互動。';draw()}else if(scene>0&&x<30&&y>350){scene--;x=590;y=320;done={};draw()}}
+const originalDraw=draw;draw=function(){originalDraw();if(x>600&&y>350)doorwayHint()};function doorwayHint(){ctx.fillStyle='#383149';ctx.font='12px sans-serif';ctx.fillText('出口 →',570,410)}
+$('objective').textContent='目標：探索房間，準備展開今天的生活。';
+draw();loop();
+</script></body></html>
