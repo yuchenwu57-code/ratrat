@@ -79,7 +79,7 @@ function interact(){
  else open(e[0],e[1]+'\n'+e[2],[{label:'繼續今天的行程',change:e[3],next:()=>{if(scene===4&&id==='sofa')finish()}}]);
 }
 function finish(){ending=true;let msg=comfort>=65&&support>=60?'今天的你收穫了不少支持，也更自在地做自己。':stress>=55?'今天有些時刻不太容易，但你有照顧自己的感受，也為自己留了空間。':'今天有平凡的小事，也有值得記住的片刻。你正在用自己的速度認識世界。';open('一天結束了',msg+'\n\n每個人的生活都不一樣，沒有一定要達成的標準，也不需要向任何人證明自己。',[{label:'再過一天',next:()=>location.reload()}])}
-function move(){if($('dialog').classList.contains('show'))return;let dx=0,dy=0;if(keys.w||keys.ArrowUp)dy--;if(keys.s||keys.ArrowDown)dy++;if(keys.a||keys.ArrowLeft)dx--;if(keys.d||keys.ArrowRight)dx++;if(dx||dy){x=Math.max(20,Math.min(620,x+dx*3));y=Math.max(45,Math.min(420,y+dy*3));draw()}}
+function move(){if($('dialog').classList.contains('show'))return;let dx=0,dy=0;if(keys.w||keys.ArrowUp)dy--;if(keys.s||keys.ArrowDown)dy++;if(keys.a||keys.ArrowLeft)dx--;if(keys.d||keys.ArrowRight)dx++;if(dx||dy){x=Math.max(20,Math.min(620,x+dx*3));y=Math.max(45,Math.min(420,y+dy*3));if(scene<4&&x>600&&y>350){scene++;x=42;y=320;done={};$('objective').textContent='目標：探索 '+scenes[scene].name+'，和周圍的人事物互動。'}else if(scene>0&&x<30&&y>350){scene--;x=590;y=320;done={}}draw()}}
 document.addEventListener('keydown',e=>{let k=e.key.toLowerCase();if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();keys[k]=true;if(k==='e'||k==='enter')interact()});document.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
 $('restart').onclick=()=>location.reload();
 let frame=0;function loop(){frame++;if(frame%2===0)move();requestAnimationFrame(loop)}
